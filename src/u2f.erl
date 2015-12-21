@@ -47,8 +47,10 @@ register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
 %% sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
 %%               Challenge, Origin, PubKey, KeyHandleBase64, Counter)
 %%  Validates response and returns 'ok' if the signature is valid.
+
 -spec sign_response(binary(), binary(), binary(), binary(), binary(),
                     binary(), binary(), integer()) -> ok.
+
 sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
               Challenge, Origin, PubKey, KeyHandleBase64, Counter) ->
     ClientData = parseClientData(ClientDataBase64),
@@ -106,6 +108,7 @@ certLength(<<_:2/bytes, CertLength:16, _/bytes>>) ->
 parseSignData(RawData) ->
     SignData = base64url:decode(RawData),
     <<UserPresence:1/bytes, Counter:4/bytes, Signature/bytes>> = SignData,
+    io:format("Counter: ~p", [Counter]),
     #sign_data{user_presence = UserPresence,
                counter_bytes = Counter,
                counter_integer = binary:decode_unsigned(Counter),
