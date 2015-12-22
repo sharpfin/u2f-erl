@@ -46,10 +46,10 @@ register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
 
 %% sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
 %%               Challenge, Origin, PubKey, KeyHandleBase64, Counter)
-%%  Validates response and returns 'ok' if the signature is valid.
+%%  Validates response and returns the new counter value if the signature is valid.
 
 -spec sign_response(binary(), binary(), binary(), binary(), binary(),
-                    binary(), binary(), integer()) -> ok.
+                    binary(), binary(), integer()) -> integer().
 
 sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
               Challenge, Origin, PubKey, KeyHandleBase64, Counter) ->
@@ -61,7 +61,7 @@ sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
     Curve = crypto:ec_curve(?CURVE),
     true = crypto:verify(?ALGORITHM, ?DIGEST, SignedData,
                          SignatureData#sign_data.signature, [PubKey, Curve]),
-    ok.
+    SignatureData#sign_data.counter_integer.
 
 %%====================================================================
 %% Internal functions
@@ -85,8 +85,8 @@ parseClientData(RawData) ->
     Typ = maps:get(<<"typ">>, Properties),
     Challenge = maps:get(<<"challenge">>, Properties),
     Origin = maps:get(<<"origin">>, Properties),
-    DataSha = crypto:hash(sha256, ClientData),
-    OriginSha = crypto:hash(sha256, Origin),
+    DataSha = crypto:hash(?DIGEST, ClientData),
+    OriginSha = crypto:hash(?DIGEST, Origin),
     #client_data{typ = Typ,
                  challenge = Challenge,
                  origin = Origin,
@@ -108,7 +108,6 @@ certLength(<<_:2/bytes, CertLength:16, _/bytes>>) ->
 parseSignData(RawData) ->
     SignData = base64url:decode(RawData),
     <<UserPresence:1/bytes, Counter:4/bytes, Signature/bytes>> = SignData,
-    io:format("Counter: ~p", [Counter]),
     #sign_data{user_presence = UserPresence,
                counter_bytes = Counter,
                counter_integer = binary:decode_unsigned(Counter),

@@ -20,5 +20,5 @@ sign_response_test() ->
     Origin = <<"https://localhost">>,
     PubKey = <<4,80,146,226,107,175,85,76,36,169,145,62,147,177,3,124,90,12,191,241,66,102,110,139,57,41,231,241,202,197,221,3,253,93,49,116,34,100,76,23,214,46,23,161,142,104,60,204,169,67,146,230,11,21,2,194,35,198,243,106,197,87,146,33,218>>,
     Counter = 12,
-    ?assertEqual(ok, u2f:sign_response(ClientData, SignData, KeyHandle, Challenge, Origin,
+    ?assertEqual(13, u2f:sign_response(ClientData, SignData, KeyHandle, Challenge, Origin,
                                        PubKey, KeyHandle, Counter)).
