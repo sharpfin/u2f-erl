@@ -6,14 +6,17 @@ Implements the Universial Second Factor protocol as specified by the [FIDO Allia
 
 The library supports three operations:
 
-######Generate challenge
+Generate challenge
+------
 Generates a random 32 bytes challenge that is base64url encoded.
 
-######Register response
+Register response
+------
 Handles the registration response from the client.
 If successful it returns the public key and the key handle, otherwise it will raise an exception.
 
-######Signature response
+Signature response
+------
 Handles the signature response from the client.
 If successfull it returns the new counter value, otherwise it will raise an exception.
 
