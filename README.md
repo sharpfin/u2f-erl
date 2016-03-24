@@ -18,7 +18,7 @@ If successful it returns the public key and the key handle, otherwise it will ra
 Signature response
 ------
 Handles the signature response from the client.
-If successfull it returns the new counter value, otherwise it will raise an exception.
+If successful it returns the new counter value, otherwise it will raise an exception.
 
 Build
 -----
