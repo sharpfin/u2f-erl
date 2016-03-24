@@ -20,7 +20,7 @@
 %%====================================================================
 
 %% challenge()
-%%  Return a new challenge (32 random bytes in URL safe Base64 encoding).
+%%  Returns a new challenge (32 random bytes in URL safe Base64 encoding).
 
 -spec challenge() -> binary().
 
@@ -29,13 +29,13 @@ challenge() ->
     base64url:encode(Random).
 
 %% register_response(ClientDataBase64, RegDataBase64, Challenge, Origin)
-%%  Validates response and returns the public key and key handle.
+%%  Validates registration response and returns the public key and key handle.
 
 -spec register_response(binary(), binary(), binary(), binary()) -> {binary(), binary()}.
 
 register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
     ClientData = parseClientData(ClientDataBase64),
-    valid = validate(ClientData, <<"navigator.id.finishEnrollment">>, Challenge, Origin),
+    validate(ClientData, <<"navigator.id.finishEnrollment">>, Challenge, Origin),
     RegData = parseRegData(RegDataBase64),
     SignedData = signedData(ClientData, RegData),
     CertPubKey = certPubKey(RegData#reg_data.cert),
@@ -54,9 +54,9 @@ register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
 sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
               Challenge, Origin, PubKey, KeyHandleBase64, Counter) ->
     ClientData = parseClientData(ClientDataBase64),
-    valid = validate(ClientData, <<"navigator.id.getAssertion">>, Challenge, Origin),
+    validate(ClientData, <<"navigator.id.getAssertion">>, Challenge, Origin),
     SignatureData = parseSignData(SignatureDataBase64),
-    valid = validate(SignatureData, Counter),
+    validate(SignatureData, Counter),
     SignedData = signedData(ClientData, SignatureData),
     Curve = crypto:ec_curve(?CURVE),
     true = crypto:verify(?ALGORITHM, ?DIGEST, SignedData,
@@ -69,18 +69,14 @@ sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
 
 validate(#client_data{typ = Typ, challenge = Challenge, origin = Origin},
          Typ, Challenge, Origin) ->
-    valid;
-validate(_, _, _, _) ->
-    invalid.
+    ok.
 
 validate(#sign_data{user_presence = <<1>>, counter_integer = Counter}, CurCounter)
   when Counter > CurCounter ->
-    valid;
-validate(_, _) ->
-    invalid.
+    ok.
 
-parseClientData(RawData) ->
-    ClientData = base64url:decode(RawData),
+parseClientData(Base64Data) ->
+    ClientData = base64url:decode(Base64Data),
     Properties = jiffy:decode(ClientData, [return_maps]),
     Typ = maps:get(<<"typ">>, Properties),
     Challenge = maps:get(<<"challenge">>, Properties),
@@ -93,8 +89,8 @@ parseClientData(RawData) ->
                  data_sha = DataSha,
                  origin_sha = OriginSha}.
 
-parseRegData(RawData) ->
-    RegData = base64url:decode(RawData),
+parseRegData(Base64Data) ->
+    RegData = base64url:decode(Base64Data),
     <<_:8, PubKey:65/bytes, KHLength:8, KeyHandle:KHLength/bytes,
       CertAndSignature/bytes>> = RegData,
     CertLength = certLength(CertAndSignature),
