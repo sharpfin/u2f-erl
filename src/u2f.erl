@@ -11,7 +11,7 @@
 -record(reg_data, {pub_key, key_handle, cert, signature}).
 -record(sign_data, {user_presence, counter_bytes, counter_integer, signature}).
 
--define(CURVE, prime256v1).
+-define(CURVE, secp256r1).
 -define(ALGORITHM, ecdsa).
 -define(DIGEST, sha256).
 
@@ -34,15 +34,20 @@ challenge() ->
 -spec register_response(binary(), binary(), binary(), binary()) -> {binary(), binary()}.
 
 register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
-    ClientData = parseClientData(ClientDataBase64),
-    validate(ClientData, <<"navigator.id.finishEnrollment">>, Challenge, Origin),
-    RegData = parseRegData(RegDataBase64),
-    SignedData = signedData(ClientData, RegData),
-    CertPubKey = certPubKey(RegData#reg_data.cert),
-    Curve = crypto:ec_curve(?CURVE),
-    true = crypto:verify(?ALGORITHM, ?DIGEST, SignedData, RegData#reg_data.signature,
-                         [CertPubKey, Curve]),
-    {RegData#reg_data.pub_key, base64url:encode(RegData#reg_data.key_handle)}.
+    try
+        ClientData = parseClientData(ClientDataBase64),
+        validate(ClientData, <<"navigator.id.finishEnrollment">>, Challenge, Origin),
+        RegData = parseRegData(RegDataBase64),
+        SignedData = signedData(ClientData, RegData),
+        CertPubKey = certPubKey(RegData#reg_data.cert),
+        Curve = crypto:ec_curve(?CURVE),
+        true = crypto:verify(?ALGORITHM, ?DIGEST, SignedData, RegData#reg_data.signature,
+                             [CertPubKey, Curve]),
+        {ok, RegData#reg_data.pub_key, base64url:encode(RegData#reg_data.key_handle)}
+    catch
+        Type:Message ->
+            handle_error(Type, Message)
+    end.
 
 %% sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
 %%               Challenge, Origin, PubKey, KeyHandleBase64, Counter)
@@ -53,15 +58,20 @@ register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
 
 sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
               Challenge, Origin, PubKey, KeyHandleBase64, Counter) ->
-    ClientData = parseClientData(ClientDataBase64),
-    validate(ClientData, <<"navigator.id.getAssertion">>, Challenge, Origin),
-    SignatureData = parseSignData(SignatureDataBase64),
-    validate(SignatureData, Counter),
-    SignedData = signedData(ClientData, SignatureData),
-    Curve = crypto:ec_curve(?CURVE),
-    true = crypto:verify(?ALGORITHM, ?DIGEST, SignedData,
-                         SignatureData#sign_data.signature, [PubKey, Curve]),
-    SignatureData#sign_data.counter_integer.
+    try
+        ClientData = parseClientData(ClientDataBase64),
+        validate(ClientData, <<"navigator.id.getAssertion">>, Challenge, Origin),
+        SignatureData = parseSignData(SignatureDataBase64),
+        validate(SignatureData, Counter),
+        SignedData = signedData(ClientData, SignatureData),
+        Curve = crypto:ec_curve(?CURVE),
+        true = crypto:verify(?ALGORITHM, ?DIGEST, SignedData,
+                             SignatureData#sign_data.signature, [PubKey, Curve]),
+        {ok, SignatureData#sign_data.counter_integer}
+    catch
+        Type:Message ->
+            handle_error(Type, Message)
+    end.
 
 %%====================================================================
 %% Internal functions
@@ -69,11 +79,15 @@ sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
 
 validate(#client_data{typ = Typ, challenge = Challenge, origin = Origin},
          Typ, Challenge, Origin) ->
-    ok.
+    ok;
+validate(_, _, _, _) ->
+    throw(validation_failed).
 
 validate(#sign_data{user_presence = <<1>>, counter_integer = Counter}, CurCounter)
   when Counter > CurCounter ->
-    ok.
+    ok;
+validate(_, _) ->
+    throw(validation_failed).
 
 parseClientData(Base64Data) ->
     ClientData = base64url:decode(Base64Data),
@@ -121,3 +135,12 @@ certPubKey(CertDer) ->
     Tbs = CertErl#'Certificate'.tbsCertificate,
     PubKeyInfo = Tbs#'TBSCertificate'.subjectPublicKeyInfo,
     PubKeyInfo#'SubjectPublicKeyInfo'.subjectPublicKey.
+
+handle_error(throw, validation_failed) ->
+    {error, validation_failed};
+handle_error(error, {badkey, _}) ->
+    {error, could_not_parse};
+handle_error(error, {badmatch, false}) ->
+    {error, wrong_signature};
+handle_error(error, {badmatch, _}) ->
+    {error, could_not_parse}.
