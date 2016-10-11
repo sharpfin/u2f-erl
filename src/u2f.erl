@@ -25,13 +25,14 @@
 -spec challenge() -> binary().
 
 challenge() ->
-    Random = crypto:rand_bytes(32),
+    Random = crypto:strong_rand_bytes(32),
     base64url:encode(Random).
 
 %% register_response(ClientDataBase64, RegDataBase64, Challenge, Origin)
 %%  Validates registration response and returns the public key and key handle.
 
--spec register_response(binary(), binary(), binary(), binary()) -> {binary(), binary()}.
+-spec register_response(binary(), binary(), binary(), binary()) ->
+    {ok, binary(), binary()} | {error, could_not_parse | validation_failed | wrong_signature}.
 
 register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
     try
@@ -54,7 +55,8 @@ register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
 %%  Validates response and returns the new counter value if the signature is valid.
 
 -spec sign_response(binary(), binary(), binary(), binary(), binary(),
-                    binary(), binary(), integer()) -> integer().
+                    binary(), binary(), integer()) ->
+    {ok, integer()} | {error, could_not_parse | validation_failed | wrong_signature}.
 
 sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
               Challenge, Origin, PubKey, KeyHandleBase64, Counter) ->

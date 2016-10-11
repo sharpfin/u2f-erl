@@ -1,7 +1,7 @@
 %%-*- mode:erlang -*-
 {application, u2f, [
   {description, "Server-side U2F library"},
-  {vsn, "0.1.3"},
+  {vsn, "0.1.4"},
   {registered, []},
   {applications, [kernel, stdlib, jiffy, base64url]},
   {links, [{"GitHub", "https://github.com/sharpfin/u2f-erl"}]},
