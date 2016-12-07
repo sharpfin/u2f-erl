@@ -88,7 +88,7 @@ register_response_wrong_client_data_test() ->
     RegData = ?REG_DATA,
     Challenge = ?REG_CHALLENGE,
     Origin = ?ORIGIN,
-    ?assertEqual({error, could_not_parse},
+    ?assertError({badkey, <<"typ">>},
                  u2f:register_response(ClientDataBase64, RegData, Challenge, Origin)).
 
 register_response_wrong_signature_test() ->
@@ -120,7 +120,7 @@ register_response_invalid_reg_data_test() ->
                  "uk1xJjqYZxunAiEAxG3WJ_vy6B0V3T4MtZ7v4Q0cGo5rGXWEf4tC2tw1GO7">>,
     Challenge = ?REG_CHALLENGE,
     Origin = ?ORIGIN,
-    ?assertEqual({error, could_not_parse},
+    ?assertError({badmatch, _},
                  u2f:register_response(ClientData, RegData, Challenge, Origin)).
 
 sign_response_ok_test() ->

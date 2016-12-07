@@ -32,22 +32,28 @@ challenge() ->
 %%  Validates registration response and returns the public key and key handle.
 
 -spec register_response(binary(), binary(), binary(), binary()) ->
-    {ok, binary(), binary()} | {error, could_not_parse | validation_failed | wrong_signature}.
+    {ok, binary(), binary()} | {error, validation_failed | wrong_signature}.
 
 register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
     try
-        ClientData = parseClientData(ClientDataBase64),
-        validate(ClientData, <<"navigator.id.finishEnrollment">>, Challenge, Origin),
-        RegData = parseRegData(RegDataBase64),
-        SignedData = signedData(ClientData, RegData),
-        CertPubKey = certPubKey(RegData#reg_data.cert),
+        ClientData = parse_client_data(ClientDataBase64),
+        validate_client_data(ClientData, <<"navigator.id.finishEnrollment">>,
+                             Challenge, Origin),
+        RegData = parse_reg_data(RegDataBase64),
+        SignedData = signed_data(ClientData, RegData),
+        CertPubKey = cert_pub_key(RegData#reg_data.cert),
         Curve = crypto:ec_curve(?CURVE),
-        true = crypto:verify(?ALGORITHM, ?DIGEST, SignedData, RegData#reg_data.signature,
-                             [CertPubKey, Curve]),
-        {ok, RegData#reg_data.pub_key, base64url:encode(RegData#reg_data.key_handle)}
+        Verified = crypto:verify(?ALGORITHM, ?DIGEST, SignedData, RegData#reg_data.signature,
+                                 [CertPubKey, Curve]),
+        case Verified of
+            true ->
+                {ok, RegData#reg_data.pub_key, base64url:encode(RegData#reg_data.key_handle)};
+            false ->
+                throw(wrong_signature)
+        end
     catch
-        Type:Message ->
-            handle_error(Type, Message)
+        throw:Message ->
+            {error, Message}
     end.
 
 %% sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
@@ -61,37 +67,42 @@ register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
 sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
               Challenge, Origin, PubKey, KeyHandleBase64, Counter) ->
     try
-        ClientData = parseClientData(ClientDataBase64),
-        validate(ClientData, <<"navigator.id.getAssertion">>, Challenge, Origin),
-        SignatureData = parseSignData(SignatureDataBase64),
-        validate(SignatureData, Counter),
-        SignedData = signedData(ClientData, SignatureData),
+        ClientData = parse_client_data(ClientDataBase64),
+        validate_client_data(ClientData, <<"navigator.id.getAssertion">>, Challenge, Origin),
+        SignatureData = parse_sign_data(SignatureDataBase64),
+        validate_sign_data(SignatureData, Counter),
+        SignedData = signed_data(ClientData, SignatureData),
         Curve = crypto:ec_curve(?CURVE),
-        true = crypto:verify(?ALGORITHM, ?DIGEST, SignedData,
-                             SignatureData#sign_data.signature, [PubKey, Curve]),
-        {ok, SignatureData#sign_data.counter_integer}
+        Verified = crypto:verify(?ALGORITHM, ?DIGEST, SignedData,
+                                 SignatureData#sign_data.signature, [PubKey, Curve]),
+        case Verified of
+            true ->
+                {ok, SignatureData#sign_data.counter_integer};
+            false ->
+                throw(wrong_signature)
+        end
     catch
-        Type:Message ->
-            handle_error(Type, Message)
+        throw:Message ->
+            {error, Message}
     end.
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
 
-validate(#client_data{typ = Typ, challenge = Challenge, origin = Origin},
+validate_client_data(#client_data{typ = Typ, challenge = Challenge, origin = Origin},
          Typ, Challenge, Origin) ->
     ok;
-validate(_, _, _, _) ->
+validate_client_data(_, _, _, _) ->
     throw(validation_failed).
 
-validate(#sign_data{user_presence = <<1>>, counter_integer = Counter}, CurCounter)
+validate_sign_data(#sign_data{user_presence = <<1>>, counter_integer = Counter}, CurCounter)
   when Counter > CurCounter ->
     ok;
-validate(_, _) ->
+validate_sign_data(_, _) ->
     throw(validation_failed).
 
-parseClientData(Base64Data) ->
+parse_client_data(Base64Data) ->
     ClientData = base64url:decode(Base64Data),
     Properties = jiffy:decode(ClientData, [return_maps]),
     Typ = maps:get(<<"typ">>, Properties),
@@ -105,19 +116,19 @@ parseClientData(Base64Data) ->
                  data_sha = DataSha,
                  origin_sha = OriginSha}.
 
-parseRegData(Base64Data) ->
+parse_reg_data(Base64Data) ->
     RegData = base64url:decode(Base64Data),
     <<_:8, PubKey:65/bytes, KHLength:8, KeyHandle:KHLength/bytes,
       CertAndSignature/bytes>> = RegData,
-    CertLength = certLength(CertAndSignature),
+    CertLength = cert_length(CertAndSignature),
     <<Cert:CertLength/bytes, Signature/bytes>> = CertAndSignature,
     #reg_data{pub_key = PubKey, key_handle = KeyHandle,
               cert = Cert, signature = Signature}.
 
-certLength(<<_:2/bytes, CertLength:16, _/bytes>>) ->
+cert_length(<<_:2/bytes, CertLength:16, _/bytes>>) ->
     CertLength + 4.
 
-parseSignData(RawData) ->
+parse_sign_data(RawData) ->
     SignData = base64url:decode(RawData),
     <<UserPresence:1/bytes, Counter:4/bytes, Signature/bytes>> = SignData,
     #sign_data{user_presence = UserPresence,
@@ -125,24 +136,15 @@ parseSignData(RawData) ->
                counter_integer = binary:decode_unsigned(Counter),
                signature = Signature}.
 
-signedData(#client_data{data_sha = DataSha, origin_sha = OriginSha},
+signed_data(#client_data{data_sha = DataSha, origin_sha = OriginSha},
            #reg_data{pub_key = PubKey, key_handle = KeyHandle}) ->
     <<<<0>>/bytes, OriginSha/bytes, DataSha/bytes, KeyHandle/bytes, PubKey/bytes>>;
-signedData(#client_data{data_sha = DataSha, origin_sha = OriginSha},
+signed_data(#client_data{data_sha = DataSha, origin_sha = OriginSha},
            #sign_data{user_presence = UserPresence, counter_bytes = Counter}) ->
     <<OriginSha/bytes, UserPresence/bytes, Counter/bytes, DataSha/bytes>>.
 
-certPubKey(CertDer) ->
+cert_pub_key(CertDer) ->
     CertErl = public_key:der_decode('Certificate', CertDer),
     Tbs = CertErl#'Certificate'.tbsCertificate,
     PubKeyInfo = Tbs#'TBSCertificate'.subjectPublicKeyInfo,
     PubKeyInfo#'SubjectPublicKeyInfo'.subjectPublicKey.
-
-handle_error(throw, validation_failed) ->
-    {error, validation_failed};
-handle_error(error, {badkey, _}) ->
-    {error, could_not_parse};
-handle_error(error, {badmatch, false}) ->
-    {error, wrong_signature};
-handle_error(error, {badmatch, _}) ->
-    {error, could_not_parse}.
