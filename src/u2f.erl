@@ -62,7 +62,7 @@ register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
 
 -spec sign_response(binary(), binary(), binary(), binary(), binary(),
                     binary(), binary(), integer()) ->
-    {ok, integer()} | {error, could_not_parse | validation_failed | wrong_signature}.
+    {ok, integer()} | {error, validation_failed | wrong_signature}.
 
 sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
               Challenge, Origin, PubKey, KeyHandleBase64, Counter) ->

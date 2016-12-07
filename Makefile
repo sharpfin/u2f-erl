@@ -10,4 +10,7 @@ test:
 	./rebar3 eunit
 
 dialyzer:
-	./rebar3 dialyzer
+	./rebar3 do dialyzer, xref
+
+ci:
+	./rebar3 do eunit, dialyzer, xref
