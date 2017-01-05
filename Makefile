@@ -1,4 +1,4 @@
-.PHONY: compile clean test dialyzer
+.PHONY: compile clean test dialyzer ci
 
 compile:
 	./rebar3 compile
