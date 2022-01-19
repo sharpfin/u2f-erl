@@ -68,7 +68,7 @@ sign_response(ClientDataBase64, SignatureDataBase64, KeyHandleBase64,
               Challenge, Origin, PubKey, KeyHandleBase64, Counter) ->
     try
         ClientData = parse_client_data(ClientDataBase64),
-        validate_client_data(ClientData, <<"navigator.id.getAssertion">>, Challenge, Origin),
+        validate_client_data(ClientData, <<"webauthn.create">>, Challenge, Origin),
         SignatureData = parse_sign_data(SignatureDataBase64),
         validate_sign_data(SignatureData, Counter),
         SignedData = signed_data(ClientData, SignatureData),
@@ -105,7 +105,7 @@ validate_sign_data(_, _) ->
 parse_client_data(Base64Data) ->
     ClientData = base64url:decode(Base64Data),
     Properties = jiffy:decode(ClientData, [return_maps]),
-    Typ = maps:get(<<"typ">>, Properties),
+    Typ = maps:get(<<"type">>, Properties),
     Challenge = maps:get(<<"challenge">>, Properties),
     Origin = maps:get(<<"origin">>, Properties),
     DataSha = crypto:hash(?DIGEST, ClientData),
