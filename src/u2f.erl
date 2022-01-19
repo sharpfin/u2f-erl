@@ -37,7 +37,7 @@ challenge() ->
 register_response(ClientDataBase64, RegDataBase64, Challenge, Origin) ->
     try
         ClientData = parse_client_data(ClientDataBase64),
-        validate_client_data(ClientData, <<"navigator.id.finishEnrollment">>,
+        validate_client_data(ClientData, <<"webauthn.create">>,
                              Challenge, Origin),
         RegData = parse_reg_data(RegDataBase64),
         SignedData = signed_data(ClientData, RegData),
